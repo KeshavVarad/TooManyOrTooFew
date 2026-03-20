@@ -47,67 +47,120 @@ export default function SurveyForm() {
 
 // ─── Sign-In Gate ──────────────────────────────────────────────────────────────
 function SignInGate() {
+  const [step, setStep] = useState<'email' | 'code'>('email');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const supabase = createClient();
 
-  async function signInWithGoogle() {
+  async function sendCode(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/` },
+    setError('');
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
     });
+    if (error) setError(error.message);
+    else setStep('code');
+    setLoading(false);
   }
 
-  return (
-    <div className="animate-fade-up" style={{ maxWidth: 560, margin: '80px auto', padding: '0 24px' }}>
-      <h1 style={{ fontSize: 42, marginBottom: 6 }}>Research Survey</h1>
-      <span className="accent-line" />
+  async function verifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'email',
+    });
+    if (error) setError('Invalid or expired code. Please try again.');
+    setLoading(false);
+  }
 
-      {/* Anonymity Notice */}
-      <div style={{
-        margin: '28px 0',
-        padding: '20px 24px',
-        background: 'var(--sage-dim)',
-        border: '1px solid rgba(106,143,126,0.3)',
-        borderLeft: '3px solid var(--sage)',
-        borderRadius: 2,
-      }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
-            <circle cx="9" cy="9" r="8" stroke="var(--sage)" strokeWidth="1.2"/>
-            <path d="M9 8v5M9 6h.01" stroke="var(--sage)" strokeWidth="1.4" strokeLinecap="round"/>
-          </svg>
-          <div>
-            <p style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, marginBottom: 6 }}>
-              Your responses are completely anonymous
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-              We ask you to sign in only to ensure one response per person. <strong style={{ color: 'var(--text)' }}>Your identity is never linked to your answers.</strong> We store only the fact that your account has responded — not what you said. You will be signed out automatically after submitting.
-            </p>
-          </div>
+  const AnonymityNotice = (
+    <div style={{
+      margin: '28px 0',
+      padding: '20px 24px',
+      background: 'var(--sage-dim)',
+      border: '1px solid rgba(106,143,126,0.3)',
+      borderLeft: '3px solid var(--sage)',
+      borderRadius: 2,
+    }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
+          <circle cx="9" cy="9" r="8" stroke="var(--sage)" strokeWidth="1.2"/>
+          <path d="M9 8v5M9 6h.01" stroke="var(--sage)" strokeWidth="1.4" strokeLinecap="round"/>
+        </svg>
+        <div>
+          <p style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, marginBottom: 6 }}>
+            Your responses are completely anonymous
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+            We ask for your email only to ensure one response per person.{' '}
+            <strong style={{ color: 'var(--text)' }}>Your email is never linked to your answers.</strong>{' '}
+            We store only the fact that you have responded — not what you said. You will be signed out automatically after submitting.
+          </p>
         </div>
       </div>
+    </div>
+  );
 
-      <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 28, lineHeight: 1.7 }}>
-        Sign in with Google to begin the survey. This takes less than a minute.
-      </p>
+  return (
+    <div className="animate-fade-up" style={{ maxWidth: 480, margin: '80px auto', padding: '0 24px' }}>
+      <h1 style={{ fontSize: 42, marginBottom: 6 }}>Research Survey</h1>
+      <span className="accent-line" />
+      {AnonymityNotice}
 
-      <button
-        className="btn-primary"
-        onClick={signInWithGoogle}
-        disabled={loading}
-        style={{ gap: 12, padding: '12px 28px' }}
-      >
-        {loading ? <div className="spinner" style={{ width: 16, height: 16 }} /> : (
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-            <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-            <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
-            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-          </svg>
-        )}
-        {loading ? 'Redirecting…' : 'Continue with Google'}
-      </button>
+      {step === 'email' ? (
+        <form onSubmit={sendCode} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7 }}>
+            Enter your email to receive a one-time verification code.
+          </p>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+            autoFocus
+          />
+          {error && <p style={{ color: '#c94040', fontSize: 12 }}>{error}</p>}
+          <button type="submit" className="btn-primary" disabled={loading}>
+            {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Sending…</> : 'Send Verification Code'}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={verifyCode} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7 }}>
+            A 6-digit code was sent to <strong style={{ color: 'var(--text)' }}>{email}</strong>. Enter it below.
+          </p>
+          <input
+            type="text"
+            value={code}
+            onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="000000"
+            required
+            autoFocus
+            inputMode="numeric"
+            style={{ letterSpacing: '0.3em', fontSize: 20, textAlign: 'center' }}
+          />
+          {error && <p style={{ color: '#c94040', fontSize: 12 }}>{error}</p>}
+          <button type="submit" className="btn-primary" disabled={loading || code.length < 6}>
+            {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Verifying…</> : 'Verify & Begin Survey'}
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => { setStep('email'); setCode(''); setError(''); }}
+            style={{ fontSize: 11 }}
+          >
+            ← Use a different email
+          </button>
+        </form>
+      )}
 
       <p style={{ marginTop: 20, fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
         By continuing you agree that your participation is voluntary and responses are used for academic research only.
