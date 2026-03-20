@@ -20,7 +20,7 @@ export default function SurveyForm() {
       .select('*')
       .order('order_index')
       .then(({ data }) => {
-        setQuestions(data ?? []);
+        setQuestions((data ?? []) as Question[]);
         setLoading(false);
       });
   }, []);

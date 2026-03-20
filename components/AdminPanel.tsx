@@ -116,7 +116,7 @@ function QuestionBuilder() {
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('questions').select('*').order('order_index');
-    setQuestions(data ?? []);
+    setQuestions((data ?? []) as Question[]);
     setLoading(false);
   }, []);
 
@@ -328,9 +328,9 @@ function ResponseManager() {
       supabase.from('answers').select('*').order('created_at', { ascending: false }),
       supabase.from('responses').select('*').order('submitted_at', { ascending: false }),
     ]);
-    setQuestions(qs ?? []);
-    setAnswers(ans ?? []);
-    setResponses(res ?? []);
+    setQuestions((qs ?? []) as Question[]);
+    setAnswers((ans ?? []) as Answer[]);
+    setResponses((res ?? []) as Response[]);
     setLoading(false);
   }, []);
 

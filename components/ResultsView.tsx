@@ -25,8 +25,8 @@ export default function ResultsView() {
         supabase.from('answers').select('*'),
         supabase.from('responses').select('*', { count: 'exact', head: true }),
       ]);
-      setQuestions(qs ?? []);
-      setAnswers(ans ?? []);
+      setQuestions((qs ?? []) as Question[]);
+      setAnswers((ans ?? []) as Answer[]);
       setResponseCount(count ?? 0);
       setLoading(false);
     }
