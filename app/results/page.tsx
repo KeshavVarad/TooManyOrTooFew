@@ -1,12 +1,12 @@
 import NavBar from '@/components/NavBar';
-import SurveyForm from '@/components/SurveyForm';
+import ResultsView from '@/components/ResultsView';
 
-export default function Home() {
+export default function ResultsPage() {
   return (
     <>
       <NavBar />
       <main style={{ flex: 1 }}>
-        <SurveyForm />
+        <ResultsView />
       </main>
     </>
   );

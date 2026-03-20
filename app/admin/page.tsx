@@ -1,12 +1,12 @@
 import NavBar from '@/components/NavBar';
-import SurveyForm from '@/components/SurveyForm';
+import AdminPanel from '@/components/AdminPanel';
 
-export default function Home() {
+export default function AdminPage() {
   return (
     <>
       <NavBar />
       <main style={{ flex: 1 }}>
-        <SurveyForm />
+        <AdminPanel />
       </main>
     </>
   );
