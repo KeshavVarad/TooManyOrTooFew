@@ -47,77 +47,91 @@ export default function SurveyForm() {
 
 // ─── Sign-In Gate ──────────────────────────────────────────────────────────────
 function SignInGate() {
-  const [step, setStep] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
+  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const supabase = createClient();
 
-  async function sendCode(e: React.FormEvent) {
+  async function sendLink(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: window.location.origin,
+      },
     });
     if (error) setError(error.message);
-    else setStep('code');
+    else setSent(true);
     setLoading(false);
   }
-
-  async function verifyCode(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: code,
-      type: 'email',
-    });
-    if (error) setError('Invalid or expired code. Please try again.');
-    setLoading(false);
-  }
-
-  const AnonymityNotice = (
-    <div style={{
-      margin: '28px 0',
-      padding: '20px 24px',
-      background: 'var(--sage-dim)',
-      border: '1px solid rgba(106,143,126,0.3)',
-      borderLeft: '3px solid var(--sage)',
-      borderRadius: 2,
-    }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
-          <circle cx="9" cy="9" r="8" stroke="var(--sage)" strokeWidth="1.2"/>
-          <path d="M9 8v5M9 6h.01" stroke="var(--sage)" strokeWidth="1.4" strokeLinecap="round"/>
-        </svg>
-        <div>
-          <p style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, marginBottom: 6 }}>
-            Your responses are completely anonymous
-          </p>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-            We ask for your email only to ensure one response per person.{' '}
-            <strong style={{ color: 'var(--text)' }}>Your email is never linked to your answers.</strong>{' '}
-            We store only the fact that you have responded — not what you said. You will be signed out automatically after submitting.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="animate-fade-up" style={{ maxWidth: 480, margin: '80px auto', padding: '0 24px' }}>
       <h1 style={{ fontSize: 42, marginBottom: 6 }}>Research Survey</h1>
       <span className="accent-line" />
-      {AnonymityNotice}
 
-      {step === 'email' ? (
-        <form onSubmit={sendCode} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Anonymity Notice */}
+      <div style={{
+        margin: '28px 0',
+        padding: '20px 24px',
+        background: 'var(--sage-dim)',
+        border: '1px solid rgba(106,143,126,0.3)',
+        borderLeft: '3px solid var(--sage)',
+        borderRadius: 2,
+      }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
+            <circle cx="9" cy="9" r="8" stroke="var(--sage)" strokeWidth="1.2"/>
+            <path d="M9 8v5M9 6h.01" stroke="var(--sage)" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          <div>
+            <p style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, marginBottom: 6 }}>
+              Your responses are completely anonymous
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+              We ask for your email only to ensure one response per person.{' '}
+              <strong style={{ color: 'var(--text)' }}>Your email is never linked to your answers.</strong>{' '}
+              We store only the fact that you have responded — not what you said. You will be signed out automatically after submitting.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {sent ? (
+        <div style={{ textAlign: 'center', padding: '16px 0' }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            background: 'var(--sage-dim)', border: '1px solid var(--sage)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 20px',
+          }}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M2 5l8 6 8-6M2 5h16v12H2V5z" stroke="var(--sage)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <p style={{ color: 'var(--text)', fontSize: 15, marginBottom: 8 }}>
+            Check your inbox
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>
+            A sign-in link was sent to <strong style={{ color: 'var(--text)' }}>{email}</strong>.<br/>
+            Click the link in the email to access the survey.
+          </p>
+          <button
+            className="btn-ghost"
+            onClick={() => { setSent(false); setEmail(''); }}
+            style={{ fontSize: 11 }}
+          >
+            ← Use a different email
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={sendLink} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7 }}>
-            Enter your email to receive a one-time verification code.
+            Enter your email and we'll send you a one-click sign-in link.
           </p>
           <input
             type="email"
@@ -129,35 +143,9 @@ function SignInGate() {
           />
           {error && <p style={{ color: '#c94040', fontSize: 12 }}>{error}</p>}
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Sending…</> : 'Send Verification Code'}
-          </button>
-        </form>
-      ) : (
-        <form onSubmit={verifyCode} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7 }}>
-            A 6-digit code was sent to <strong style={{ color: 'var(--text)' }}>{email}</strong>. Enter it below.
-          </p>
-          <input
-            type="text"
-            value={code}
-            onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="000000"
-            required
-            autoFocus
-            inputMode="numeric"
-            style={{ letterSpacing: '0.3em', fontSize: 20, textAlign: 'center' }}
-          />
-          {error && <p style={{ color: '#c94040', fontSize: 12 }}>{error}</p>}
-          <button type="submit" className="btn-primary" disabled={loading || code.length < 6}>
-            {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Verifying…</> : 'Verify & Begin Survey'}
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => { setStep('email'); setCode(''); setError(''); }}
-            style={{ fontSize: 11 }}
-          >
-            ← Use a different email
+            {loading
+              ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Sending…</>
+              : 'Send Sign-In Link'}
           </button>
         </form>
       )}
