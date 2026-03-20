@@ -87,6 +87,21 @@ export type Database = {
         }
         Relationships: []
       }
+      submissions: {
+        Row: {
+          user_id: string
+          submitted_at: string | null
+        }
+        Insert: {
+          user_id: string
+          submitted_at?: string | null
+        }
+        Update: {
+          user_id?: string
+          submitted_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

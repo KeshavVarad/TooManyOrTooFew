@@ -5,10 +5,12 @@ let client: ReturnType<typeof _createClient<Database>> | null = null;
 
 export function createClient() {
   if (!client) {
-    client = _createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      console.error('[Supabase] Missing env vars:', { url: !!url, key: !!key });
+    }
+    client = _createClient<Database>(url!, key!);
   }
   return client;
 }
