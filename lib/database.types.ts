@@ -91,14 +91,17 @@ export type Database = {
         Row: {
           user_id: string
           submitted_at: string | null
+          response_id: string | null
         }
         Insert: {
           user_id: string
           submitted_at?: string | null
+          response_id?: string | null
         }
         Update: {
           user_id?: string
           submitted_at?: string | null
+          response_id?: string | null
         }
         Relationships: []
       }

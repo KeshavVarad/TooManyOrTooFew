@@ -8,7 +8,9 @@ import type { User } from '@supabase/supabase-js';
 export default function SurveyForm() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  // null = not yet checked, string = existing response id, '' = never submitted
+  const [existingResponseId, setExistingResponseId] = useState<string | null | undefined>(undefined);
+  const [initialAnswers, setInitialAnswers] = useState<Record<string, AnswerValue>>({});
 
   const supabase = createClient();
 
@@ -23,26 +25,54 @@ export default function SurveyForm() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Check if this user already submitted
+  // When user is known, load their submission + existing answers
   useEffect(() => {
-    if (!user) return;
-    supabase
-      .from('submissions')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => setAlreadySubmitted(!!data));
+    if (!user) { setExistingResponseId(undefined); return; }
+
+    async function loadExisting() {
+      const { data: sub } = await supabase
+        .from('submissions')
+        .select('response_id')
+        .eq('user_id', user!.id)
+        .maybeSingle();
+
+      if (!sub?.response_id) {
+        setExistingResponseId(''); // never submitted
+        return;
+      }
+
+      setExistingResponseId(sub.response_id);
+
+      // Load their previous answers to pre-fill
+      const { data: ans } = await supabase
+        .from('answers')
+        .select('question_id, value')
+        .eq('response_id', sub.response_id);
+
+      if (ans) {
+        const map: Record<string, AnswerValue> = {};
+        ans.forEach(a => { if (a.question_id) map[a.question_id] = a.value as AnswerValue; });
+        setInitialAnswers(map);
+      }
+    }
+    loadExisting();
   }, [user]);
 
-  if (authLoading) return (
+  if (authLoading || (user && existingResponseId === undefined)) return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
       <div className="spinner" />
     </div>
   );
 
   if (!user) return <SignInGate />;
-  if (alreadySubmitted) return <AlreadySubmitted />;
-  return <SurveyBody user={user} onSubmitted={() => setAlreadySubmitted(true)} />;
+
+  return (
+    <SurveyBody
+      user={user}
+      existingResponseId={existingResponseId || null}
+      initialAnswers={initialAnswers}
+    />
+  );
 }
 
 // ─── Sign-In Gate ──────────────────────────────────────────────────────────────
@@ -74,14 +104,10 @@ function SignInGate() {
       <h1 style={{ fontSize: 42, marginBottom: 6 }}>Research Survey</h1>
       <span className="accent-line" />
 
-      {/* Anonymity Notice */}
       <div style={{
-        margin: '28px 0',
-        padding: '20px 24px',
-        background: 'var(--sage-dim)',
-        border: '1px solid rgba(106,143,126,0.3)',
-        borderLeft: '3px solid var(--sage)',
-        borderRadius: 2,
+        margin: '28px 0', padding: '20px 24px',
+        background: 'var(--sage-dim)', border: '1px solid rgba(106,143,126,0.3)',
+        borderLeft: '3px solid var(--sage)', borderRadius: 2,
       }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
@@ -95,7 +121,8 @@ function SignInGate() {
             <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
               We ask for your email only to ensure one response per person.{' '}
               <strong style={{ color: 'var(--text)' }}>Your email is never linked to your answers.</strong>{' '}
-              We store only the fact that you have responded — not what you said. You will be signed out automatically after submitting.
+              We store only the fact that you have responded — not what you said.
+              You will be signed out automatically after submitting.
             </p>
           </div>
         </div>
@@ -113,18 +140,12 @@ function SignInGate() {
               <path d="M2 5l8 6 8-6M2 5h16v12H2V5z" stroke="var(--sage)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <p style={{ color: 'var(--text)', fontSize: 15, marginBottom: 8 }}>
-            Check your inbox
-          </p>
+          <p style={{ color: 'var(--text)', fontSize: 15, marginBottom: 8 }}>Check your inbox</p>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>
             A sign-in link was sent to <strong style={{ color: 'var(--text)' }}>{email}</strong>.<br/>
             Click the link in the email to access the survey.
           </p>
-          <button
-            className="btn-ghost"
-            onClick={() => { setSent(false); setEmail(''); }}
-            style={{ fontSize: 11 }}
-          >
+          <button className="btn-ghost" onClick={() => { setSent(false); setEmail(''); }} style={{ fontSize: 11 }}>
             ← Use a different email
           </button>
         </div>
@@ -134,18 +155,12 @@ function SignInGate() {
             Enter your email and we'll send you a one-click sign-in link.
           </p>
           <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-            autoFocus
+            type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com" required autoFocus
           />
           {error && <p style={{ color: '#c94040', fontSize: 12 }}>{error}</p>}
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading
-              ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Sending…</>
-              : 'Send Sign-In Link'}
+            {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Sending…</> : 'Send Sign-In Link'}
           </button>
         </form>
       )}
@@ -157,35 +172,20 @@ function SignInGate() {
   );
 }
 
-// ─── Already Submitted ─────────────────────────────────────────────────────────
-function AlreadySubmitted() {
-  return (
-    <div className="animate-fade-up" style={{ maxWidth: 480, margin: '80px auto', padding: '0 24px', textAlign: 'center' }}>
-      <div style={{
-        width: 52, height: 52, borderRadius: '50%',
-        background: 'var(--gold-dim)', border: '1px solid var(--gold)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        margin: '0 auto 24px',
-      }}>
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-          <path d="M4 11.5L8.5 16L18 6" stroke="var(--gold)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </div>
-      <h2 style={{ fontSize: 34, marginBottom: 12 }}>Already submitted</h2>
-      <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: 32 }}>
-        We already have your response. Each participant may submit once to keep the results fair.
-      </p>
-      <a href="/results" className="btn-ghost" style={{ textDecoration: 'none' }}>
-        View Results →
-      </a>
-    </div>
-  );
-}
-
 // ─── Survey Body ───────────────────────────────────────────────────────────────
-function SurveyBody({ user, onSubmitted }: { user: User; onSubmitted: () => void }) {
+function SurveyBody({
+  user,
+  existingResponseId,
+  initialAnswers,
+}: {
+  user: User;
+  existingResponseId: string | null;
+  initialAnswers: Record<string, AnswerValue>;
+}) {
+  const isEditing = !!existingResponseId;
+
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>(initialAnswers);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -204,6 +204,11 @@ function SurveyBody({ user, onSubmitted }: { user: User; onSubmitted: () => void
       });
   }, []);
 
+  // Sync initialAnswers into state once loaded (handles async load order)
+  useEffect(() => {
+    setAnswers(initialAnswers);
+  }, [initialAnswers]);
+
   function setAnswer(questionId: string, value: AnswerValue) {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
   }
@@ -220,32 +225,45 @@ function SurveyBody({ user, onSubmitted }: { user: User; onSubmitted: () => void
 
     setSubmitting(true);
     try {
-      // Insert response
-      const { data: response, error: rErr } = await supabase
-        .from('responses')
-        .insert({ session_id: crypto.randomUUID() })
-        .select()
-        .single();
-      if (rErr || !response) throw rErr;
+      let responseId = existingResponseId;
 
-      // Insert answers
+      if (!responseId) {
+        // First-time submission: create a new response
+        const { data: response, error: rErr } = await supabase
+          .from('responses')
+          .insert({ session_id: crypto.randomUUID() })
+          .select()
+          .single();
+        if (rErr || !response) throw rErr;
+        responseId = response.id;
+      } else {
+        // Returning: delete old answers so we can replace cleanly
+        await supabase.from('answers').delete().eq('response_id', responseId);
+      }
+
+      // Insert current answers
       const answerRows = Object.entries(answers).map(([question_id, value]) => ({
-        response_id: response.id,
+        response_id: responseId!,
         question_id,
         value,
         is_featured: false,
       }));
-      const { error: aErr } = await supabase.from('answers').insert(answerRows);
-      if (aErr) throw aErr;
+      if (answerRows.length > 0) {
+        const { error: aErr } = await supabase.from('answers').insert(answerRows);
+        if (aErr) throw aErr;
+      }
 
-      // Record submission (dedup marker) — this is NOT linked to answers
-      await supabase.from('submissions').insert({ user_id: user.id });
+      // Upsert submission with the response_id
+      const { error: sErr } = await supabase.from('submissions').upsert({
+        user_id: user.id,
+        response_id: responseId,
+        submitted_at: new Date().toISOString(),
+      });
+      if (sErr) throw sErr;
 
-      // Sign out immediately to preserve anonymity in the browser
+      // Sign out to preserve anonymity
       await supabase.auth.signOut();
-
       setSubmitted(true);
-      onSubmitted();
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
@@ -277,42 +295,70 @@ function SurveyBody({ user, onSubmitted }: { user: User; onSubmitted: () => void
           <path d="M4 11.5L8.5 16L18 6" stroke="var(--sage)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </div>
-      <h2 style={{ fontSize: 36, marginBottom: 12 }}>Thank you.</h2>
+      <h2 style={{ fontSize: 36, marginBottom: 12 }}>
+        {isEditing ? 'Response updated.' : 'Thank you.'}
+      </h2>
       <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: 8 }}>
-        Your response has been recorded anonymously. You have been signed out to protect your privacy.
+        Your response has been {isEditing ? 'updated' : 'recorded'} anonymously.
+        You have been signed out to protect your privacy.
       </p>
       <p style={{ color: 'var(--text-dim)', fontSize: 12, marginBottom: 32 }}>
         Your identity was never associated with your answers.
       </p>
-      <a href="/results" className="btn-ghost" style={{ textDecoration: 'none' }}>
-        View Results →
-      </a>
+      <a href="/results" className="btn-ghost" style={{ textDecoration: 'none' }}>View Results →</a>
     </div>
   );
+
+  const answeredCount = questions.filter(q => answers[q.id]).length;
+  const newQuestions = questions.filter(q => isEditing && !initialAnswers[q.id]);
 
   return (
     <form onSubmit={handleSubmit} style={{ maxWidth: 680, margin: '0 auto', padding: '48px 24px' }}>
       <div className="animate-fade-up" style={{ marginBottom: 40 }}>
         <h1 style={{ fontSize: 42, marginBottom: 8 }}>Research Survey</h1>
         <span className="accent-line" style={{ marginBottom: 16 }} />
-        <div style={{
-          marginTop: 20,
-          padding: '12px 16px',
-          background: 'var(--sage-dim)',
-          border: '1px solid rgba(106,143,126,0.25)',
-          borderRadius: 2,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-        }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
-            <circle cx="7" cy="7" r="6" stroke="var(--sage)" strokeWidth="1.2"/>
-            <path d="M7 6v4M7 4.5h.01" stroke="var(--sage)" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
-            Your responses are anonymous. Your identity is not linked to your answers.
-          </p>
-        </div>
+
+        {/* Returning user banner */}
+        {isEditing && (
+          <div style={{
+            marginTop: 20, padding: '14px 18px',
+            background: 'var(--gold-dim)', border: '1px solid rgba(201,168,76,0.25)',
+            borderLeft: '3px solid var(--gold)', borderRadius: 2,
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+          }}>
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+              <path d="M7.5 1v4M7.5 10v.5M3 3l2.5 2.5M12 3l-2.5 2.5M1 7.5h4M10 7.5h4" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+            <div>
+              <p style={{ fontSize: 12, color: 'var(--text)', marginBottom: 2 }}>
+                Your previous answers are pre-filled. Make any changes and resubmit.
+              </p>
+              {newQuestions.length > 0 && (
+                <p style={{ fontSize: 11, color: 'var(--gold)' }}>
+                  {newQuestions.length} new question{newQuestions.length > 1 ? 's have' : ' has'} been added since your last response.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Anonymity reminder */}
+        {!isEditing && (
+          <div style={{
+            marginTop: 20, padding: '12px 16px',
+            background: 'var(--sage-dim)', border: '1px solid rgba(106,143,126,0.25)',
+            borderLeft: '3px solid var(--sage)', borderRadius: 2,
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="7" cy="7" r="6" stroke="var(--sage)" strokeWidth="1.2"/>
+              <path d="M7 6v4M7 4.5h.01" stroke="var(--sage)" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+              Your responses are anonymous. Your identity is not linked to your answers.
+            </p>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -322,6 +368,7 @@ function SurveyBody({ user, onSubmitted }: { user: User; onSubmitted: () => void
             question={q}
             index={i}
             value={answers[q.id]}
+            isNew={isEditing && !initialAnswers[q.id]}
             onChange={(val) => setAnswer(q.id, val)}
           />
         ))}
@@ -339,10 +386,12 @@ function SurveyBody({ user, onSubmitted }: { user: User; onSubmitted: () => void
 
       <div style={{ marginTop: 40, display: 'flex', alignItems: 'center', gap: 16 }}>
         <button type="submit" className="btn-primary" disabled={submitting}>
-          {submitting ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Submitting…</> : 'Submit Response'}
+          {submitting
+            ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Submitting…</>
+            : isEditing ? 'Update Response' : 'Submit Response'}
         </button>
         <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>
-          {Object.keys(answers).length} / {questions.length} answered
+          {answeredCount} / {questions.length} answered
         </span>
       </div>
     </form>
@@ -350,11 +399,19 @@ function SurveyBody({ user, onSubmitted }: { user: User; onSubmitted: () => void
 }
 
 // ─── Question Card ─────────────────────────────────────────────────────────────
-function QuestionCard({ question, index, value, onChange }: {
-  question: Question; index: number; value: AnswerValue | undefined; onChange: (v: AnswerValue) => void;
+function QuestionCard({ question, index, value, isNew, onChange }: {
+  question: Question; index: number; value: AnswerValue | undefined;
+  isNew: boolean; onChange: (v: AnswerValue) => void;
 }) {
   return (
-    <div className="card card-hover animate-fade-up" style={{ padding: 24, animationDelay: `${index * 60}ms` }}>
+    <div
+      className="card card-hover animate-fade-up"
+      style={{
+        padding: 24,
+        animationDelay: `${index * 60}ms`,
+        borderLeft: isNew ? '2px solid var(--gold)' : '2px solid transparent',
+      }}
+    >
       <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
         <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: 'var(--text-dim)', paddingTop: 4, minWidth: 28 }}>
           {String(index + 1).padStart(2, '0')}
@@ -364,9 +421,13 @@ function QuestionCard({ question, index, value, onChange }: {
             {question.text}
             {question.required && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>*</span>}
           </p>
-          <span className="badge badge-sage" style={{ fontSize: 9 }}>{question.type.replace('_', ' ')}</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <span className="badge badge-sage" style={{ fontSize: 9 }}>{question.type.replace('_', ' ')}</span>
+            {isNew && <span className="badge badge-gold" style={{ fontSize: 9 }}>New</span>}
+          </div>
         </div>
       </div>
+
       <div style={{ paddingLeft: 44 }}>
         {question.type === 'scale' && (
           <ScaleInput
