@@ -162,6 +162,12 @@ function SignInGate() {
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Sending…</> : 'Send Sign-In Link'}
           </button>
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+            Already responded?{' '}
+            <span style={{ color: 'var(--text-muted)' }}>
+              Use the same email to sign in again and update your answers.
+            </span>
+          </p>
         </form>
       )}
 
@@ -321,23 +327,49 @@ function SurveyBody({
         {/* Returning user banner */}
         {isEditing && (
           <div style={{
-            marginTop: 20, padding: '14px 18px',
-            background: 'var(--gold-dim)', border: '1px solid rgba(201,168,76,0.25)',
-            borderLeft: '3px solid var(--gold)', borderRadius: 2,
-            display: 'flex', alignItems: 'flex-start', gap: 10,
+            marginTop: 20,
+            background: 'var(--gold-dim)',
+            border: '1px solid rgba(201,168,76,0.3)',
+            borderRadius: 2,
+            overflow: 'hidden',
           }}>
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
-              <path d="M7.5 1v4M7.5 10v.5M3 3l2.5 2.5M12 3l-2.5 2.5M1 7.5h4M10 7.5h4" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round"/>
-            </svg>
-            <div>
-              <p style={{ fontSize: 12, color: 'var(--text)', marginBottom: 2 }}>
-                Your previous answers are pre-filled. Make any changes and resubmit.
-              </p>
+            <div style={{
+              padding: '12px 18px',
+              borderBottom: '1px solid rgba(201,168,76,0.2)',
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'rgba(201,168,76,0.08)',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M7 1a6 6 0 1 1 0 12A6 6 0 0 1 7 1zm0 5v4m0-5.5h.01" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.04em' }}>
+                You're editing your previous response
+              </span>
               {newQuestions.length > 0 && (
-                <p style={{ fontSize: 11, color: 'var(--gold)' }}>
-                  {newQuestions.length} new question{newQuestions.length > 1 ? 's have' : ' has'} been added since your last response.
-                </p>
+                <span className="badge badge-gold" style={{ marginLeft: 'auto', fontSize: 9 }}>
+                  {newQuestions.length} new question{newQuestions.length > 1 ? 's' : ''}
+                </span>
               )}
+            </div>
+            <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                'Your previous answers are already filled in below.',
+                'Scroll through and change any answers you want to update.',
+                newQuestions.length > 0
+                  ? `Answer the ${newQuestions.length} new question${newQuestions.length > 1 ? 's' : ''} marked with a gold "New" badge.`
+                  : null,
+                'Click "Update Response" at the bottom when you\'re done.',
+              ].filter(Boolean).map((step, i) => (
+                <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <span style={{
+                    flexShrink: 0, width: 18, height: 18, borderRadius: '50%',
+                    background: 'rgba(201,168,76,0.2)', border: '1px solid rgba(201,168,76,0.4)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 9, color: 'var(--gold)', fontWeight: 600,
+                  }}>{i + 1}</span>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>{step}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
